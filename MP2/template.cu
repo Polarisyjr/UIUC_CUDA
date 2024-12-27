@@ -1,6 +1,6 @@
 
 #include <wb.h>
-
+#include <iostream>
 #define wbCheck(stmt)                                                     \
   do {                                                                    \
     cudaError_t err = stmt;                                               \
@@ -17,6 +17,15 @@ __global__ void matrixMultiply(float *A, float *B, float *C, int numARows,
                                int numBColumns, int numCRows,
                                int numCColumns) {
   //@@ Insert code to implement matrix multiplication here
+  int row = blockIdx.y * blockDim.y + threadIdx.y; 
+  int col = blockIdx.x * blockDim.x + threadIdx.x;
+  if (row < numCRows && col < numCColumns) {
+    float value = 0.0;
+    for (int k = 0; k < numAColumns; ++k) {
+      value += A[row * numAColumns + k] * B[k * numBColumns + col];
+    }
+    C[row * numCColumns + col] = value;
+  }
 }
 
 int main(int argc, char **argv) {
@@ -45,6 +54,9 @@ int main(int argc, char **argv) {
   //@@ Set numCRows and numCColumns
   numCRows = numARows;
   numCColumns = numBColumns;
+  //if(numAColumns != numBRows) std::cerr<< invalid argument
+  //std::cout<<numCRows<<" "<<numCColumns<<std::endl;
+  //@@ End Set numCRows and numCColumns
   //@@ Allocate the hostC matrix
   hostC = (float *)malloc(numCRows * numCColumns * sizeof(float));
   //@@ End Allocate the hostC matrix
@@ -63,13 +75,16 @@ int main(int argc, char **argv) {
 
   wbTime_start(GPU, "Copying input memory to the GPU.");
   //@@ Copy memory to the GPU here
-
+  wbCheck(cudaMemcpy(deviceA, hostA, numARows * numAColumns * sizeof(float), cudaMemcpyHostToDevice));
+  wbCheck(cudaMemcpy(deviceB, hostB, numBRows * numBColumns * sizeof(float), cudaMemcpyHostToDevice));
+  wbCheck(cudaMemcpy(deviceC, hostC, numCRows * numCColumns * sizeof(float), cudaMemcpyHostToDevice));
+  //@@ End Copy memory to the GPU here
   wbTime_stop(GPU, "Copying input memory to the GPU.");
 
   //@@ Initialize the grid and block dimensions here
-  dim3 blockDim(16, 16); // 每个块包含 16x16 个线程
+  dim3 blockDim(16, 16); 
   dim3 gridDim((numCColumns + blockDim.x - 1) / blockDim.x,
-              (numCRows + blockDim.y - 1) / blockDim.y); // 确定网格大小
+              (numCRows + blockDim.y - 1) / blockDim.y); 
   //@@ End Initialize the grid and block dimensions here
   wbTime_start(Compute, "Performing CUDA computation");
   //@@ Launch the GPU Kernel here
