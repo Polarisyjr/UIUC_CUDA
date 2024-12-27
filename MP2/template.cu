@@ -43,9 +43,11 @@ int main(int argc, char **argv) {
   hostB = (float *)wbImport(wbArg_getInputFile(args, 1), &numBRows,
                             &numBColumns);
   //@@ Set numCRows and numCColumns
-  numCRows = 0;
-  numCColumns = 0;
+  numCRows = numARows;
+  numCColumns = numBColumns;
   //@@ Allocate the hostC matrix
+  hostC = (float *)malloc(numCRows * numCColumns * sizeof(float));
+  //@@ End Allocate the hostC matrix
   wbTime_stop(Generic, "Importing data and creating memory on host");
 
   wbLog(TRACE, "The dimensions of A are ", numARows, " x ", numAColumns);
@@ -53,7 +55,10 @@ int main(int argc, char **argv) {
 
   wbTime_start(GPU, "Allocating GPU memory.");
   //@@ Allocate GPU memory here
-
+  wbCheck(cudaMalloc((void **)&deviceA, numARows * numAColumns * sizeof(float)));
+  wbCheck(cudaMalloc((void **)&deviceB, numBRows * numBColumns * sizeof(float)));
+  wbCheck(cudaMalloc((void **)&deviceC, numCRows * numCColumns * sizeof(float)));
+  //@@ End Allocate GPU memory here
   wbTime_stop(GPU, "Allocating GPU memory.");
 
   wbTime_start(GPU, "Copying input memory to the GPU.");
@@ -62,21 +67,31 @@ int main(int argc, char **argv) {
   wbTime_stop(GPU, "Copying input memory to the GPU.");
 
   //@@ Initialize the grid and block dimensions here
-
+  dim3 blockDim(16, 16); // 每个块包含 16x16 个线程
+  dim3 gridDim((numCColumns + blockDim.x - 1) / blockDim.x,
+              (numCRows + blockDim.y - 1) / blockDim.y); // 确定网格大小
+  //@@ End Initialize the grid and block dimensions here
   wbTime_start(Compute, "Performing CUDA computation");
   //@@ Launch the GPU Kernel here
-
+  matrixMultiply<<<gridDim, blockDim>>>(deviceA, deviceB, deviceC,
+                                      numARows, numAColumns, numBRows,
+                                      numBColumns, numCRows, numCColumns);
+  //@@ End Launch the GPU Kernel here                                    
   cudaDeviceSynchronize();
   wbTime_stop(Compute, "Performing CUDA computation");
 
   wbTime_start(Copy, "Copying output memory to the CPU");
   //@@ Copy the GPU memory back to the CPU here
-
+  wbCheck(cudaMemcpy(hostC, deviceC, numCRows * numCColumns * sizeof(float), cudaMemcpyDeviceToHost));
+  //@@ End Copy the GPU memory back to the CPU here
   wbTime_stop(Copy, "Copying output memory to the CPU");
 
   wbTime_start(GPU, "Freeing GPU Memory");
   //@@ Free the GPU memory here
-
+  wbCheck(cudaFree(deviceA));
+  wbCheck(cudaFree(deviceB));
+  wbCheck(cudaFree(deviceC));
+  //@@ End Free the GPU memory here
   wbTime_stop(GPU, "Freeing GPU Memory");
 
   wbSolution(args, hostC, numCRows, numCColumns);
