@@ -73,10 +73,16 @@ int main(int argc, char **argv) {
   wbTime_stop(GPU, "Copying input memory to the GPU.");
 
   //@@ Initialize the grid and block dimensions here
-
+  dim3 blockDim(16,16);
+  dim3 gridDim((numCColumns + blockDim.x - 1) / blockDim.x,
+                (numCRows + blockDim.y - 1) / blockDim.y); 
+  //@@ End Initialize the grid and block dimensions here
   wbTime_start(Compute, "Performing CUDA computation");
   //@@ Launch the GPU Kernel here
-
+  matrixMultiply<<<gridDim, blockDim>>>(deviceA, deviceB, deviceC,
+                                      numARows, numAColumns, numBRows,
+                                      numBColumns, numCRows, numCColumns);
+  //@@ End Launch the GPU Kernel here   
   cudaDeviceSynchronize();
   wbTime_stop(Compute, "Performing CUDA computation");
 
