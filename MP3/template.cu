@@ -18,6 +18,37 @@ __global__ void matrixMultiplyShared(float *A, float *B, float *C,
                                      int numCRows, int numCColumns) {
   //@@ Insert code to implement matrix multiplication here
   //@@ You have to use shared memory for this MP
+  const int TILE = 16;
+  __shared__ float Asub[TILE][TILE];
+  __shared__ float Bsub[TILE][TILE];
+
+  int row = blockIdx.y * blockDim.y + threadIdx.y;
+  int col = blockIdx.x * blockDim.x + threadIdx.x;
+
+  float value = 0.0;
+  for (int i = 0; i < (numAColumns + TILE - 1) / TILE; ++i) {
+    // load
+    if (row < numARows && (i * TILE + threadIdx.x) < numAColumns) {
+      Asub[threadIdx.y][threadIdx.x] = A[row * numAColumns + i * TILE + threadIdx.x];
+    }else {
+      Asub[threadIdx.y][threadIdx.x] = 0.0;
+    }
+    if (col < numBColumns && (i * TILE + threadIdx.y) < numBRows) {
+      Bsub[threadIdx.y][threadIdx.x] = B[(i * TILE + threadIdx.y) * numBColumns + col];
+    }else{
+      Bsub[threadIdx.y][threadIdx.x] = 0.0;
+    }
+    __syncthreads();
+    // compute
+    for (int k = 0; k < TILE; ++k) {
+      value += Asub[threadIdx.y][k] * Bsub[k][threadIdx.x];
+    }
+    __syncthreads();
+  }
+
+  if (row < numCRows && col < numCColumns) {
+    C[row * numCColumns + col] = value;
+  }
 }
 
 int main(int argc, char **argv) {
@@ -79,7 +110,7 @@ int main(int argc, char **argv) {
   //@@ End Initialize the grid and block dimensions here
   wbTime_start(Compute, "Performing CUDA computation");
   //@@ Launch the GPU Kernel here
-  matrixMultiply<<<gridDim, blockDim>>>(deviceA, deviceB, deviceC,
+  matrixMultiplyShared<<<gridDim, blockDim>>>(deviceA, deviceB, deviceC,
                                       numARows, numAColumns, numBRows,
                                       numBColumns, numCRows, numCColumns);
   //@@ End Launch the GPU Kernel here   
