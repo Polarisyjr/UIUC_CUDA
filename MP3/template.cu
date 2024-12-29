@@ -46,7 +46,11 @@ int main(int argc, char **argv) {
   //@@ Set numCRows and numCColumns
   numCRows = 0;
   numCColumns = 0;
+  numCRows = numARows;
+  numCColumns = numBColumns;
   //@@ Allocate the hostC matrix
+  hostC = (float *)malloc(numCRows * numCColumns * sizeof(float));
+  //@@ End Allocate the hostC matrix
   wbTime_stop(Generic, "Importing data and creating memory on host");
 
   wbLog(TRACE, "The dimensions of A are ", numARows, " x ", numAColumns);
@@ -54,7 +58,10 @@ int main(int argc, char **argv) {
 
   wbTime_start(GPU, "Allocating GPU memory.");
   //@@ Allocate GPU memory here
-
+  wbCheck(cudaMalloc((void **)&deviceA, numARows * numAColumns * sizeof(float)));
+  wbCheck(cudaMalloc((void **)&deviceB, numBRows * numBColumns * sizeof(float)));
+  wbCheck(cudaMalloc((void **)&deviceC, numCRows * numCColumns * sizeof(float)));
+  //@@ End Allocate GPU memory here
   wbTime_stop(GPU, "Allocating GPU memory.");
 
   wbTime_start(GPU, "Copying input memory to the GPU.");
